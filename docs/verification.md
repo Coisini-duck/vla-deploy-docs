@@ -1,5 +1,5 @@
 ---
-title: 验证（11 节 44 项）
+title: 验证（12 节 51 项）
 sidebar_position: 8
 ---
 
@@ -7,8 +7,16 @@ sidebar_position: 8
 
 回归脚本：`/root/ros2_ws/verify.sh`
 
-一条命令跑完**构建 → 包注册 → 频率 → 限幅 → 看门狗 → 全栈 → Gazebo 仿真 → 清理**，退出码 0 = 全过。
-最近一次：**36 项 PASS / 0 FAIL**。
+一条命令跑完**构建 → 包注册 → 频率 → 限幅 → 看门狗 → 全栈 → Gazebo → TensorRT → Gazebo+VLA 串联 → 清理**，退出码 0 = 全过。
+
+```bash
+./verify.sh                    # 严格档，建议机器空闲时跑
+VERIFY_LENIENT=1 ./verify.sh   # 满负载档：同时开着别的程序时用
+```
+
+**两档的区别**：满负载下 DDS 采样与 100 Hz 回读会被挤（实测 `/joint_states` 从 100 Hz 掉到 73 Hz、稳定期看门狗偶发 1 次触发），这不是系统回归。宽松档把 `/joint_states` 阈值降到 60 Hz、允许看门狗 ≤2 次，并在结果行标注「宽松档：满负载」。
+
+另外，**速率类断言一律读节点自己日志里的单次耗时中位数**，而不是 `ros2 topic hz` —— 后者会因 QoS 深度 10 和管道拥塞丢消息（曾把 0.28 s/次 的正常推理报成 0.374 Hz）。
 
 ```bash
 /root/ros2_ws/verify.sh           # 无需 GUI
