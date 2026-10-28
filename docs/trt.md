@@ -55,6 +55,26 @@ sess = ort.InferenceSession(
 92 ms/次 ≈ **10.9 Hz** 出块，而一块 chunk 覆盖 1.67 s、上游 2 Hz 刷新就够 —— 余量从「够用」变成「很宽」。
 代价是首次部署要付一次 ~3 分钟的 engine 构建（可预烧进镜像），以及 engine 与硬件绑定。
 
+## 接进 ROS 节点（全栈实测）
+
+`smolvla_policy.py` 加了 `backend` 参数（也可用环境变量 `SMOLVLA_BACKEND`）：
+
+| 后端 | 单次推理 | chunk 频率 | 跟踪误差均值 | 装载 |
+|---|---|---|---|---|
+| `torch`（默认） | 0.25–0.39 s | **1.90–2.02 Hz** | 0.0116 rad | 约 7 s |
+| **`onnx`（TRT）** | **0.072–0.154 s** | **7.97–8.01 Hz** | **0.0007 rad** | 14.2–15.2 s（命中缓存） |
+
+```bash
+SMOLVLA_BACKEND=onnx HF_HUB_OFFLINE=1 \
+  /root/venvs/vla/bin/python smolvla_policy.py --ros-args -p chunk_rate:=8.0
+```
+
+节点启动时会做一次**数值对齐自检**：同一批次分别喂 torch 与 onnx，打印 `max|diff|`。
+实测 **9.091e-03**（torch 侧走 bf16、ONNX 是 fp32，这个量级正常），超过 1e-2 才告警。
+
+> 跟踪误差从 0.0116 降到 0.0007，不是模型变准了，而是**块来得更密**：
+> 8 Hz 下每块只推进 1/8 s，桥的限速滞后来不及累积。
+
 ## 两个坑（都踩过）
 
 | 现象 | 真因 | 修法 |
