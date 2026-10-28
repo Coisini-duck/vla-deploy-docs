@@ -54,6 +54,38 @@ ros2 run vla_bridge bridge --ros-args \
 > 跟随误差小到 1e-11，是因为 `forward_position_controller` 直接把关节设到目标（无外力负载）。
 > 真正能体现物理的是**限位那一条**：指令 2.0 被 Gazebo 钳到 1.5。
 
+## 撞柱测试：**用位置接口验不出来**（重要负面结论）
+
+实验设计：世界里 x = ±0.35 各立一根 0.1×0.1×0.6 m 柱子，命令 `joint1 = ±0.9 rad`，
+预期机械臂摆到 ~0.6 rad 就被柱子挡住。
+
+实测结果：
+
+| 场景 | 指令 | 实际 joint1 |
+|---|---|---|
+| 有柱（两侧都放） | +0.9 | **0.9000** |
+| 有柱（两侧都放） | −0.9 | **−0.9000** |
+| 无柱对照 | +0.9 | **0.9000** |
+
+**柱子完全没起作用。** 不是柱子位置放错了，而是：
+
+> `gz_ros2_control` 的 `forward_position_controller` 是**运动学写入**（对内直接 `SetPosition`），
+> 不经过力学求解器 —— 所以接触不会产生反力，关节想去哪就去哪。
+
+这意味着「接上 Gazebo = 有物理」这句话**只对了一半**：URDF 限位会生效（那是关节约束，不是接触），
+但**接触/碰撞要用动力学接口才验得出来**。
+
+### 要真验碰撞，得换命令接口
+
+| 做法 | 需要改什么 |
+|---|---|
+| effort 接口 | URDF 加 `<command_interface name="effort"/>`，控制器换 `effort_controllers/JointGroupEffortController`，自己写 PD（或 JTC 带 PID gains） |
+| velocity 接口 | 命令速度 + 控制器闭环，接触会表现为速度跟不上 |
+| `JointTrajectoryController` | 带 PID，接触 → 跟踪误差显著上升（最接近真实机器人测试） |
+
+**教训（可推广）**：做物理验证前先问一句 —— **这个控制接口是运动学写入还是动力学驱动？**
+用运动学接口测碰撞，永远测不出来，而且会得出"仿真没问题"的错误结论。
+
 ## 踩坑记录
 
 - **`$(find vla_control)` 在 xacro 里需要先 source 工作空间**，否则报 `package 'vla_control' not found`；
