@@ -14,6 +14,8 @@ slug: /
 
 ## 四层链路
 
+![VLA 真机部署四层链路架构](./img/architecture.svg)
+
 ```
 策略层   SmolVLA 450M (lerobot/smolvla_base)        ── /vla/action_chunk  2 Hz
    │
