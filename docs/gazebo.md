@@ -108,8 +108,18 @@ collision 段（7 个）与柱位均已核对，不是"没写碰撞体"。
 
 **结论：碰撞验证仍未形成可信结论**，`verify.sh` 第 12 节只断言跟踪误差与限幅，不断言接触。
 
-下一步诊断（未做）：`gz topic -e -t /world/vla_world/contacts` 看接触点是否产生；
-核对 SDF 转换后的 joint limit；换物理引擎交叉验证是否 solver 穿透。
+### 观测路径也走不通（已查）
+
+本想用 `/world/vla_world/contacts` 看接触点，结果它**始终 0 字节**。逐层排查：
+
+1. 世界文件只有 `physics` / `user-commands` / `scene-broadcaster` 三个系统，没有 `gz-sim-contact-system`；
+2. 补上该 plugin 后依旧 0 字节，`gz topic -l` 里根本没有 `contact` 话题；
+3. 查插件目录：本机 `gz-sim-8` 的 contact 系统**没有安装**，所以这个系统加载不了。
+
+也就是说：**这台机器上无法直接观测接触**，只能从关节运动反推。补入的 plugin 已撤销，避免留一个加载不到的假配置。
+
+要真正做完这项，路线是：装齐 `gz-sim` 的 contact 系统 → 复现接触点 → 再谈 A/B。
+按当前信息判断，无柱世界停在 ≈1.099 rad、有柱却到 1.5，更像是**物理引擎或关节限位配置**的问题，而不是"柱子挡不住"。
 
 ## 踩坑记录
 
