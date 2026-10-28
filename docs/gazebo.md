@@ -86,6 +86,31 @@ ros2 run vla_bridge bridge --ros-args \
 **教训（可推广）**：做物理验证前先问一句 —— **这个控制接口是运动学写入还是动力学驱动？**
 用运动学接口测碰撞，永远测不出来，而且会得出"仿真没问题"的错误结论。
 
+### 已经换了 effort 接口（部分完成）
+
+改动：
+
+- `vla_arm.urdf.xacro` 每个关节同时声明 `position` 与 `effort` 命令接口（各 6 个）；
+- `controllers.yaml` 增加 `joint_group_effort_controller`；
+- `gz.launch.py` 增加 `spawn_fwd` 参数，做 effort 实验时设 `false`。
+
+已验证：控制器能 active，恒定力矩确实让关节转动（0.4 N·m → joint1 摆到 1.5 限位）。
+
+**但 A/B 结果与预期相反**：
+
+| 世界 | 施加 0.15–0.4 N·m 后 joint1 落点 |
+|---|---|
+| 有柱（x=±0.35，柱 0.30×0.30×0.80） | 1.5000 rad（限位） |
+| 无柱 | ≈1.099 rad 后长时间不动 |
+
+几何估算机械臂半径约 0.72 m、柱面在 x=0.20，应在 0.28 rad 附近接触；实测直接穿过。
+collision 段（7 个）与柱位均已核对，不是"没写碰撞体"。
+
+**结论：碰撞验证仍未形成可信结论**，`verify.sh` 第 12 节只断言跟踪误差与限幅，不断言接触。
+
+下一步诊断（未做）：`gz topic -e -t /world/vla_world/contacts` 看接触点是否产生；
+核对 SDF 转换后的 joint limit；换物理引擎交叉验证是否 solver 穿透。
+
 ## 踩坑记录
 
 - **`$(find vla_control)` 在 xacro 里需要先 source 工作空间**，否则报 `package 'vla_control' not found`；
